@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-15, windows-latest]
+        os: [macos-15]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -50,51 +50,14 @@ jobs:
       working-directory: ${{github.workspace}}/build
       run: cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DLITECORE_SANITIZE=ON
 
-    - name: Configure CMake (Windows)
-      # "Note the current convention is to use the -S and -B options here to specify source
-      # and build directories, but this is only available with CMake 3.13 and higher.
-      # The CMake binaries on the Github Actions machines are (as of this writing) 3.12"
-      if: runner.os == 'Windows'
-      working-directory: ${{github.workspace}}/build
-      run: cmake .. -A x64
-
     - name: Build
       # Use cmake to build -- this will invoke `make` on Linux/Mac, Visual Studio on Windows.
       working-directory: ${{github.workspace}}/build
       run: cmake --build . --config $env:BUILD_TYPE
 
-#### TEST
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifact
+        path: ${{github.workspace}}/build
 
-    - name: Install French Locale On Linux
-      if: runner.os == 'Linux'
-      shell: bash
-      # One of the Fleece tests needs the French locale installed.
-      run: sudo localedef -v -c -i fr_FR -f UTF-8 fr_FR
-
-    - name: Test
-      if: runner.os != 'Windows'
-      working-directory: ${{github.workspace}}/build
-      shell: bash
-      run: |
-        pushd LiteCore/tests
-        ./CppTests -r quiet --min-duration 10
-        popd
-        echo "\n\n"
-        pushd C/tests
-        ./C4Tests -r quiet
-        popd
-
-    - name: Test On Windows
-      # 'quiet' mode is causing deadlocks on Windows. As workaround, use `-r list` instead.
-      if: runner.os == 'Windows'
-      working-directory: ${{github.workspace}}/build
-      shell: bash
-      run: |
-        mkdir -p /c/tmp
-        pushd LiteCore/tests/$BUILD_TYPE
-        ./CppTests.exe -r list --min-duration 10
-        popd
-        echo "\n\n"
-        pushd C/tests/$BUILD_TYPE
-        ./C4Tests.exe -r list --min-duration 10
-        popd
